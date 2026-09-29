@@ -25,20 +25,29 @@ export const NON_WRITER_MUTATING_TOOLS: readonly string[] = [
   "acumatica_clear_cache",
 ];
 
+/** Name segments rendered as acronyms rather than title-cased. */
+const ACRONYMS: Readonly<Record<string, string>> = { gi: "GI", xml: "XML" };
+
 /** "acumatica_get_project_budget" -> "Get Project Budget" */
 export function titleFromName(name: string): string {
   return name
     .replace(/^acumatica_/, "")
     .split("_")
     .filter(Boolean)
-    .map((w) => (w === "gi" ? "GI" : w.charAt(0).toUpperCase() + w.slice(1)))
+    .map((w) => ACRONYMS[w] ?? w.charAt(0).toUpperCase() + w.slice(1))
     .join(" ");
 }
 
 /**
  * Annotation set for one tool.
- * - Writer tools: readOnlyHint false, idempotent upsert, not destructive.
- * - Other mutating tools: readOnlyHint false, idempotent, not destructive.
+ * - Writer tools: readOnlyHint false, destructiveHint true, idempotentHint
+ *   false. The writers are PUT-as-upsert: with the key supplied they
+ *   overwrite existing field values (destructive); with the key omitted
+ *   Acumatica auto-numbers a NEW record, so a repeated call creates a
+ *   duplicate (not idempotent).
+ * - Other mutating tools (clear_cache): readOnlyHint false, idempotent, not
+ *   destructive -- clearing an already-clear cache is a no-op, and the cache
+ *   rebuilds on demand.
  * - Everything else: readOnlyHint true.
  * openWorldHint is false throughout: every tool talks only to the configured
  * Acumatica tenant or the worker's own storage.
@@ -46,7 +55,7 @@ export function titleFromName(name: string): string {
 export function annotationsFor(name: string, writerNames: ReadonlySet<string>): ToolAnnotations {
   const title = titleFromName(name);
   if (writerNames.has(name)) {
-    return { title, readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false };
+    return { title, readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false };
   }
   if (NON_WRITER_MUTATING_TOOLS.includes(name)) {
     return { title, readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false };

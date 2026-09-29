@@ -1,3 +1,6 @@
+// Copyright 2026 Hall Boys, Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { annotationsFor, titleFromName, writesEnabled, NON_WRITER_MUTATING_TOOLS } from "../src/tools/tool-annotations.ts";
@@ -28,18 +31,25 @@ test("writer tools are never labelled read-only", () => {
   for (const name of writers) {
     const a = annotationsFor(name, writers);
     assert.equal(a.readOnlyHint, false, name);
-    assert.equal(a.destructiveHint, false, name);
+    // Upsert overwrites existing values when keyed...
+    assert.equal(a.destructiveHint, true, name);
+    // ...and auto-numbers a new record when the key is omitted, so a
+    // repeated call is NOT a no-op.
+    assert.equal(a.idempotentHint, false, name);
   }
 });
 
 test("clear_cache is not labelled read-only", () => {
   assert.deepEqual([...NON_WRITER_MUTATING_TOOLS], ["acumatica_clear_cache"]);
-  assert.equal(annotationsFor("acumatica_clear_cache", writers).readOnlyHint, false);
+  const a = annotationsFor("acumatica_clear_cache", writers);
+  assert.equal(a.readOnlyHint, false);
+  assert.equal(a.destructiveHint, false);
+  assert.equal(a.idempotentHint, true);
 });
 
 test("titles", () => {
   assert.equal(titleFromName("acumatica_get_project_budget"), "Get Project Budget");
-  assert.equal(titleFromName("acumatica_explain_gi_xml"), "Explain GI Xml");
+  assert.equal(titleFromName("acumatica_explain_gi_xml"), "Explain GI XML");
 });
 
 test("writesEnabled matches runWriter kill-switch rule", () => {

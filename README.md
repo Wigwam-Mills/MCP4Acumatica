@@ -8,7 +8,7 @@ Each user authenticates with their own Acumatica credentials. Their Acumatica ro
 
 ## Features
 
-- **51 tools** -- 38 read-only lookups + 6 utility/discovery + 4 schema-knowledge + 2 documentation + 1 write tool (Customer create/update, disabled by default) (see [Available Tools](#available-tools))
+- **51 tools** -- 38 read-only lookups + 6 utility/discovery + 4 schema-knowledge + 2 documentation + 1 write tool (Customer create/update, disabled by default and hidden from clients until enabled) (see [Available Tools](#available-tools))
 - **Per-user OAuth** -- users log in with their Acumatica credentials (or SSO)
 - **Role-based access** -- Acumatica's security model governs what each user sees
 - **Access gate** -- only users who can read a designated canary Generic Inquiry can connect (restrict it however you like; a marker role such as `MCP Access` is the recommended way)
@@ -216,7 +216,7 @@ If you change hostnames, remember to add the new `https://<host>/callback` to yo
 2. Click **Add Connector** and enter the URL: `https://<your-worker-url>/mcp`
 3. On first use, you'll be redirected to your Acumatica login page
 4. If your account can read the canary GI (i.e. you've been granted access), you'll see a consent page explaining AI data processing
-5. After acknowledging consent, Claude will have access to all 51 tools
+5. After acknowledging consent, Claude will have access to the tools — 50 by default; the write tool appears only after an administrator enables write tools
 
 ### Claude Code (CLI)
 
@@ -227,6 +227,23 @@ claude mcp add acumatica-erp --transport streamable-http https://<your-worker-ur
 ### API (via Anthropic SDK)
 
 When using the Anthropic API with MCP, point the MCP client to `https://<your-worker-url>/mcp`. The server supports OAuth 2.1 with Dynamic Client Registration at `/register`.
+
+### Microsoft 365 Copilot (custom federated connector)
+
+Copilot connects through a **custom federated connector** (Microsoft 365 admin center → **Copilot** → **Connectors** → **Gallery** → *Create a new connector* → **Connect to MCP server**). Copilot only enables tools that carry the `readOnlyHint` annotation; every tool here is annotated (0.53.0+), so the read tools are available. With write tools disabled (the default), the write tool is hidden and the server is entirely read-only from Copilot's point of view.
+
+The connector form takes an OAuth registration ID rather than performing Dynamic Client Registration, so register a client by hand first:
+
+1. **Register an OAuth client with this server.** `POST https://<your-worker-url>/register` with the Teams redirect URI; keep the returned `client_id` and `client_secret`:
+   ```bash
+   curl -s -X POST https://<your-worker-url>/register -H "Content-Type: application/json" -d '{"client_name":"Microsoft 365 Copilot","redirect_uris":["https://teams.microsoft.com/api/platform/v1.0/oAuthRedirect"]}'
+   ```
+2. **Register it in the [Teams Developer Portal](https://dev.teams.microsoft.com/)** (**Tools** → **OAuth client registration**): client ID/secret from step 1, authorization endpoint `https://<your-worker-url>/authorize`, token and refresh endpoints `https://<your-worker-url>/token`, PKCE on. Copy the **OAuth client registration ID** it produces.
+3. **Create the connector** in the admin center: base URL `https://<your-worker-url>/mcp`, and paste the registration ID.
+4. **Scope the rollout.** A new connector defaults to visible to everyone in the tenant — restrict it right after creating it. Users still need the Acumatica `MCP Access` gate like any other client.
+5. After a server upgrade that changes the tool list, users must disconnect and reconnect the connector in Copilot (**Settings** → **Sources**) to reload it.
+
+Microsoft's reference: [Set up custom federated connectors](https://learn.microsoft.com/microsoft-365/copilot/connectors/set-up-custom-federated-connectors). Steps 1, 4 and 5 are as reported by the contributor who production-tested this ([PR #3](https://github.com/hallboys/MCP4Acumatica/pull/3)); the redirect URI and portal fields match Microsoft's docs.
 
 ## Available Tools
 
@@ -332,7 +349,7 @@ When using the Anthropic API with MCP, point the MCP client to `https://<your-wo
 | `acumatica_search_docs` | Search the official Acumatica documentation by section heading / Form ID |
 | `acumatica_get_doc_section` | Read documentation sections — a screen's full reference by Form ID (e.g. `AP301000`) |
 
-### Write (disabled by default; enable at `/docs/admin/settings`)
+### Write (disabled and hidden from clients by default; enable at `/docs/admin/settings`)
 | Tool | Description |
 |------|-------------|
 | `acumatica_create_or_update_customer` | Create or update a Customer via PUT-as-upsert, with dry-run preview and `confirm` gate |

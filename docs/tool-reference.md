@@ -1,6 +1,16 @@
 # MCP4Acumatica -- Tool Reference
 
-Complete specification for all 51 tools available in the MCP4Acumatica (v0.52.0).
+Complete specification for all 51 tools available in the MCP4Acumatica (v0.53.0).
+
+> **Tool annotations (0.53.0).** Every tool carries MCP annotations and a human-readable `title`.
+> All tools are `readOnlyHint: true` except the write tools (`readOnlyHint: false`,
+> `destructiveHint: true`, `idempotentHint: false`) and `acumatica_clear_cache` (`readOnlyHint: false`,
+> `idempotentHint: true` — it clears the server's own metadata cache, not Acumatica data).
+> `openWorldHint` is `false` throughout. Claude treats these as hints; Microsoft 365 Copilot
+> federated connectors **require** `readOnlyHint` and withhold unannotated tools.
+>
+> **Visible tool count.** 51 tools are registered, but the write tool is **hidden from
+> `tools/list`** while write tools are disabled (the default), so clients see **50**.
 
 > The `**Endpoint:**` paths below show the default deployment values — the `Default` endpoint
 > name and contract version `25.200.001`. The base `/entity/{name}/{version}` is governed by
@@ -137,7 +147,7 @@ Clear cached metadata (entity schemas, GI lists, GI field schemas). Use when Acu
 
 ## Write Tools
 
-Write tools mutate Acumatica data. They are **disabled by default** and must be explicitly enabled by an administrator at `/docs/admin/settings` (toggle "Enable Write Tools"). All write tools use a **two-phase confirmation** pattern to prevent accidental mutations:
+Write tools mutate Acumatica data. They are **disabled by default** and must be explicitly enabled by an administrator at `/docs/admin/settings` (toggle "Enable Write Tools"). While disabled, write tools are **hidden from `tools/list`** (since 0.53.0), so clients don't see them at all; the server also refuses any call to one. Enabling takes effect on the next MCP session (the tool list is built once per session), and clients that cache the tool list may need a disconnect/reconnect. All write tools use a **two-phase confirmation** pattern to prevent accidental mutations:
 
 1. Call the tool **without** `confirm` (or with any value other than `'true'`) to get a dry-run preview. The preview shows exactly what would be written in Acumatica's `{value: X}` wire format -- no data is changed.
 2. Call again with `confirm: 'true'` to commit the change.

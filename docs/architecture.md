@@ -415,12 +415,14 @@ The per-user rate limiter (see **Rate Limiting** above) caps each user at **3 co
 
 ### Tool Registration
 
-All 49 tools are registered in the `init()` method of `AcumaticaMcpServer`. Each tool has:
+All 51 tools are registered in the `init()` method of `AcumaticaMcpServer`. Each tool has:
 
 1. **Name** -- e.g., `acumatica_get_customer`
 2. **Description** -- Human-readable description for the MCP client
 3. **Zod schema** -- Parameter validation (MUST use simple types only)
 4. **Handler** -- Async function that calls the Acumatica API
+
+Registration goes through a thin wrapper (`this.tool(...)`) that records each `RegisteredTool` by name. At the end of `init()`, `applyToolPolicy()` applies MCP annotations from one central policy (`src/tools/tool-annotations.ts`) — `readOnlyHint: true` by default, `readOnlyHint: false` for the write tools and `acumatica_clear_cache` — and, when write tools are disabled, calls `disable()` on the write tools so they drop out of `tools/list`. Microsoft 365 Copilot federated connectors require `readOnlyHint` before enabling a tool; Claude treats annotations as hints. Hiding is visibility only: `runWriter` still enforces the kill switch on every call. **Register new tools with `this.tool(...)`, not `this.server.tool(...)`** — a direct registration skips the annotation policy.
 
 ### Tool Execution Flow
 

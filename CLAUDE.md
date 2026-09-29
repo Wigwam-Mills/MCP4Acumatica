@@ -7,7 +7,7 @@ Remote MCP (Model Context Protocol) server on Cloudflare Workers that connects C
 - **License:** Apache 2.0 — Copyright 2026 Hall Boys, Inc.
 - **Copyright header** required on all `.ts` source files: `// Copyright 2026 Hall Boys, Inc.` + `// SPDX-License-Identifier: Apache-2.0`
 - **Git config (this repo only):** `user.email = saratvemuri@hallboys.com`
-- **Current tag:** `25R2-0.52.0`
+- **Current tag:** `25R2-0.53.0`
 - **Deployed at:** `https://mcp4acumatica.hallboys.com` (primary custom domain) / `https://acumatica-mcp.hallboys.com` (legacy alias, kept active during migration) / `https://mcp4acumatica.<account>.workers.dev` (workers.dev fallback)
 - **GitHub:** `https://github.com/hallboys/MCP4Acumatica`
 
@@ -115,6 +115,8 @@ Acumatica is the sole identity provider. Users log in with their Acumatica crede
 
 6. **`AppEnv` / `IKeyValueStore` abstraction.** Tool handlers and shared libraries (`config.ts`, `metadata-cache.ts`, `acumatica-oauth.ts`, `acumatica-client.ts`) use the platform-agnostic `AppEnv` type (which has `store: IKeyValueStore`) instead of the Cloudflare-specific `Env`. In `AcumaticaMcpServer.init()` we construct a fresh `this.appEnv: AppEnv` from `this.env` (never mutating the CF-provided binding object — that reference is shared across requests in the same isolate and hot-patching a `store` field onto it would leak state across sessions). `Env` no longer extends `AppEnv`; it only describes the CF bindings (plus Acumatica connection fields pulled from wrangler.jsonc). CF-specific code (auth handler, admin handler) uses raw `Env` / `KVNamespace` directly.
 
+7. **Tool annotations are a hard requirement for Microsoft 365 Copilot (0.53.0).** Copilot federated connectors silently withhold any tool lacking `readOnlyHint` — OAuth succeeds, sessions 200, no error, zero tool calls. Policy lives in one place (`src/tools/tool-annotations.ts`, `annotationsFor()`): default `readOnlyHint: true`; writers `readOnlyHint: false, destructiveHint: true, idempotentHint: false` (PUT-as-upsert overwrites when keyed and **auto-numbers a duplicate** when the key is omitted — so never mark a writer idempotent); `acumatica_clear_cache` `readOnlyHint: false, idempotentHint: true`; `openWorldHint: false` throughout. `init()` registers through the `this.tool(...)` wrapper (records each `RegisteredTool`), then `applyToolPolicy()` annotates everything and `disable()`s the writers when `writes_enabled` is off — hidden from `tools/list`, still registered (a future per-user write gate can `enable()` per session), and `runWriter` still enforces the kill switch per call. **A tool registered via `this.server.tool(...)` directly bypasses the policy and ships unannotated** — Copilot would withhold it with no error. With writes off, clients see 50 tools, not 51.
+
 ## Historical Note: Why We Removed Microsoft Entra ID
 
 The initial design used a two-login chained OAuth flow: users first authenticated via Microsoft Entra ID (to identify who they are), then were chained to Acumatica OAuth (to get API permissions). This required a separate Entra app registration, three callback routes, and intermediate state management in KV.
@@ -170,6 +172,7 @@ src/
 │   ├── getter-registry.ts         # 38 per-entity `acumatica_get_*` tools as data (GETTER_TOOLS) + runGetter
 │   ├── getter-errors.ts           # endpointAware404Message() — endpoint-aware 404 re-messaging (import-free leaf, unit-tested)
 │   ├── writer-registry.ts         # write tools as data (WRITER_TOOLS) + runWriter (kill-switch, dry-run gate, allowlist, PUT, audit sink)
+│   ├── tool-annotations.ts        # annotationsFor()/titleFromName()/writesEnabled() — central MCP annotation policy (import-free leaf, unit-tested)
 │   ├── writer-validation.ts       # validateWriterPayload() — size/JSON/type + top-level & nested allowlist (import-free leaf, unit-tested)
 │   ├── entity-list.ts             # acumatica_list_entities (Utility)
 │   ├── entity-schema.ts           # acumatica_describe_entity (Utility)
@@ -194,6 +197,7 @@ test/                              # Node built-in test runner (node --test, TS 
 ├── getter-errors.test.ts          # endpointAware404Message (Default vs custom endpoint 404)
 ├── gi-registry.test.ts            # checkGiGate semantics + cleanGiRow + parseEdmxTypes/assembleRegistry
 ├── field-transforms.test.ts       # wrapFields/unwrapFields round-trips (nested/array/idempotent/null)
+├── tool-annotations.test.ts       # annotation policy (read-only default, writer destructive/non-idempotent, clear_cache, titles)
 ├── writer-validation.test.ts      # validateWriterPayload (size cap / JSON / type / top-level + nested allowlist)
 ├── rate-limiter.test.ts           # config precedence, bounded slot wait, per-minute bucket, token-accounting order, envelope
 ├── preflight-authed.test.ts       # interpretTenantAuthed/EndpointAuthed (a 404 never becomes a pass)
@@ -601,6 +605,7 @@ instead of a rewrite.
 | Claude Code (v2.1.81+) | CIMD preferred, DCR fallback | ✅ Works — publishes metadata at `https://claude.ai/oauth/claude-code-client-metadata` |
 | Claude Desktop | DCR | ✅ Works — uses `/register` |
 | ChatGPT | DCR (manual selection required) | ⚠️ Works with manual DCR — CIMD auto-detection broken on their side |
+| Microsoft 365 Copilot (custom federated connector) | Manual `/register` + Teams Developer Portal OAuth registration | ✅ Works since 0.53.0 (tool annotations) — contributor-verified in production ([PR #3](https://github.com/hallboys/MCP4Acumatica/pull/3)); setup in README → "Microsoft 365 Copilot" |
 
 ### OAuth Discovery Endpoints
 
