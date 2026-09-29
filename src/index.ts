@@ -3,7 +3,7 @@
 
 import { OAuthProvider, getOAuthApi } from "@cloudflare/workers-oauth-provider";
 import { McpAgent } from "agents/mcp";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer, type RegisteredTool } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { Env, AppEnv, AuthProps } from "./types/acumatica";
 import { GETTER_TOOLS, paramsShape, runGetter } from "./tools/getter-registry";
@@ -19,6 +19,7 @@ import {
   handleListSchemaEntities,
 } from "./tools/schema-discovery";
 import { handleExplainGiXml } from "./tools/gi-explain";
+import { annotationsFor, writesEnabled } from "./tools/tool-annotations";
 import { handleSearchDocs, handleGetDocSection } from "./tools/docs-tools";
 import { indexExists, INDEX_KEYS } from "./lib/index-store";
 import { AcumaticaApiError } from "./lib/acumatica-client";
@@ -69,6 +70,20 @@ export class AcumaticaMcpServer extends McpAgent<Env, Record<string, unknown>, A
   // re-arms and even deletes the alarm as it sees fit), so a raw
   // setAlarm would be silently cancelled and an alarm() override would
   // shadow the base dispatcher.
+  /**
+   * Every tool registered in init(), by name, so annotations and the
+   * writes-disabled visibility rule can be applied in one place
+   * (see applyToolPolicy / src/tools/tool-annotations.ts).
+   */
+  private registeredTools = new Map<string, RegisteredTool>();
+
+  /** Thin wrapper over server.tool() that records the RegisteredTool by name. */
+  private tool: McpServer["tool"] = ((...args: unknown[]) => {
+    const registered = (this.server.tool as (...a: unknown[]) => RegisteredTool)(...args);
+    this.registeredTools.set(args[0] as string, registered);
+    return registered;
+  }) as McpServer["tool"];
+
   private logBuffer: Record<string, unknown>[] = [];
   private bufferHydrated = false;
   private flushScheduled = false;
@@ -119,7 +134,7 @@ export class AcumaticaMcpServer extends McpAgent<Env, Record<string, unknown>, A
     // lookup = one entry in GETTER_TOOLS — no per-tool handler file or
     // per-tool `server.tool(...)` boilerplate.
     for (const spec of GETTER_TOOLS) {
-      this.server.tool(
+      this.tool(
         spec.name,
         spec.description,
         paramsShape(spec.params),
@@ -140,7 +155,7 @@ export class AcumaticaMcpServer extends McpAgent<Env, Record<string, unknown>, A
     // performs the dry-run gate, and calls client.put(). Adding a new write
     // entity = one entry in WRITER_TOOLS — no per-tool handler file needed.
     for (const spec of WRITER_TOOLS) {
-      this.server.tool(
+      this.tool(
         spec.name,
         spec.description,
         writerParamsShape(spec),
@@ -170,7 +185,7 @@ export class AcumaticaMcpServer extends McpAgent<Env, Record<string, unknown>, A
     // OData $metadata parse, cache invalidation), so they stay as
     // dedicated handlers.
 
-    this.server.tool(
+    this.tool(
       "acumatica_run_inquiry",
       "Execute a Generic Inquiry (GI) exposed via OData in Acumatica and return filtered results. Use this for custom reports and cross-entity queries. Use acumatica_list_generic_inquiries to discover GI names and acumatica_describe_inquiry to get field schema before calling this tool.",
       {
@@ -202,7 +217,7 @@ export class AcumaticaMcpServer extends McpAgent<Env, Record<string, unknown>, A
       }
     );
 
-    this.server.tool(
+    this.tool(
       "acumatica_list_entities",
       "List or search any Acumatica entity in the contract-based Default endpoint with filtering, sorting, and field selection. Use this to find records matching criteria (e.g., open invoices over $10,000, customers in a state, stock items below reorder point) or to look up an ID by name when calling an acumatica_get_* tool. IMPORTANT: Always pass filterExpression to scope queries — never retrieve all records from large entities (JournalTransaction, Invoice, Bill, Payment, etc.). Do NOT paginate by making multiple calls to fetch all data — if the response is truncated, ask the user to narrow their filter. Auth/role metadata entities (User, UserRole, Role) are intentionally blocked and will return an error. To discover available entity names, use the entityName from any acumatica_get_* tool, or call acumatica_describe_entity to verify a candidate name. NOTE: some complex document entities (PurchaseOrder, PhysicalInventoryCount, Shipment) cannot be server-side $filtered except by their key field — a broad/non-key filter (including substringof) either errors with a CannotOptimizeException or silently returns an empty set even when matching records exist. On these, filter by the key field for a single record (e.g. OrderNbr/ShipmentNbr eq '<value>' with topN=1), and use a Generic Inquiry (acumatica_run_inquiry) for any broad search.",
       {
@@ -242,7 +257,7 @@ export class AcumaticaMcpServer extends McpAgent<Env, Record<string, unknown>, A
       }
     );
 
-    this.server.tool(
+    this.tool(
       "acumatica_describe_entity",
       "Describe the fields and structure of any Acumatica entity. Call this before acumatica_list_entities to discover available field names, types, and sub-entities for filtering, sorting, and selection. Schemas are cached for 24 hours — if an Acumatica administrator just added a custom field or modified the entity, call acumatica_clear_cache (target='schema:EntityName') first.",
       {
@@ -259,7 +274,7 @@ export class AcumaticaMcpServer extends McpAgent<Env, Record<string, unknown>, A
       }
     );
 
-    this.server.tool(
+    this.tool(
       "acumatica_list_generic_inquiries",
       "List all Generic Inquiries (GIs) exposed via OData in Acumatica. Returns inquiry names. Use this to discover available GI names before calling acumatica_run_inquiry or acumatica_describe_inquiry.",
       {
@@ -284,7 +299,7 @@ export class AcumaticaMcpServer extends McpAgent<Env, Record<string, unknown>, A
       }
     );
 
-    this.server.tool(
+    this.tool(
       "acumatica_describe_inquiry",
       "Returns the field schema for a Generic Inquiry (GI) exposed via OData. Field names and types are inferred from a single live sample row — types may be approximate (e.g. a column that is null in the sample reports as 'unknown'), and a GI that returns no rows yields an empty field list. Curated GIs return authoritative names/types instead, and mark calculated (expression) columns with 'calculated: true' — those columns CANNOT be used in a run_inquiry filterExpression. Use this before calling acumatica_run_inquiry to know which fields are available for filtering and selection. For authoritative entity schemas (not GIs), use acumatica_describe_entity instead.",
       {
@@ -301,7 +316,7 @@ export class AcumaticaMcpServer extends McpAgent<Env, Record<string, unknown>, A
       }
     );
 
-    this.server.tool(
+    this.tool(
       "acumatica_clear_cache",
       "Clear cached metadata (entity schemas, GI lists, GI field schemas). Use when an Acumatica administrator has changed customizations and cached schema data is stale. With no arguments, clears all cached metadata.",
       {
@@ -333,7 +348,7 @@ export class AcumaticaMcpServer extends McpAgent<Env, Record<string, unknown>, A
     // Registered only when the schema index is present, so a deploy without a
     // built index simply doesn't advertise tools that would error.
     if (await indexExists(this.appEnv, INDEX_KEYS.schema)) {
-      this.server.tool(
+      this.tool(
         "acumatica_search_schema",
         "Search the Acumatica entity catalog (contract/OData API schema) by name/keyword and/or find which entities contain a given field. Use this to discover the right entity and its shape when building integrations or queries — it answers offline from your instance's API schema, with no record query. For authoritative live per-entity detail (including custom fields), follow up with acumatica_describe_entity.",
         {
@@ -362,7 +377,7 @@ export class AcumaticaMcpServer extends McpAgent<Env, Record<string, unknown>, A
         }
       );
 
-      this.server.tool(
+      this.tool(
         "acumatica_get_schema_entity",
         "Return the full schema for one Acumatica entity from the offline catalog: fields (name + type), available actions, and expandable sub-entities ($expand targets). Fast and tenant-free — use it to learn an entity's shape before calling acumatica_list_entities or an acumatica_get_* tool. Use acumatica_describe_entity instead when you need the authoritative live schema (e.g. to confirm a just-added custom field).",
         {
@@ -379,7 +394,7 @@ export class AcumaticaMcpServer extends McpAgent<Env, Record<string, unknown>, A
         }
       );
 
-      this.server.tool(
+      this.tool(
         "acumatica_list_schema_entities",
         "List the Acumatica entity catalog from the offline schema index, optionally filtered by a name/module prefix. Use this to browse what entities exist. Returns names + field counts; call acumatica_get_schema_entity for detail.",
         {
@@ -413,7 +428,7 @@ export class AcumaticaMcpServer extends McpAgent<Env, Record<string, unknown>, A
     // only when the docs index is present. Both tools skip field redaction
     // (vendor documentation, not tenant data — see callTool).
     if (await indexExists(this.appEnv, INDEX_KEYS.docs)) {
-      this.server.tool(
+      this.tool(
         "acumatica_search_docs",
         "Search the official Acumatica documentation (user guides, form/screen reference, release notes) for this instance's release. Use this for 'how do I...' / 'what does this screen or field do' / 'what changed in this release' questions — it answers from the vendor's official docs with no tenant data access. IMPORTANT: search matches SECTION HEADINGS and Form IDs, not body text — query with feature/section terminology (e.g. 'expense reclassification', 'release AP retainage'), not full sentences. For questions about a specific screen, pass its Form ID (e.g. formId='AP301000') — or just call acumatica_get_doc_section with the Form ID directly. Follow up with acumatica_get_doc_section to read a result's text.",
         {
@@ -448,7 +463,7 @@ export class AcumaticaMcpServer extends McpAgent<Env, Record<string, unknown>, A
         }
       );
 
-      this.server.tool(
+      this.tool(
         "acumatica_get_doc_section",
         "Read a section of the official Acumatica documentation. Pass either a chunkId from acumatica_search_docs (e.g. 'projects:214') to get that section's text plus prev/next neighbors for browsing, or a Form ID (e.g. 'AP301000') to get the screen's reference documentation (purpose, toolbar commands, tabs and fields) — large screens return the first sections plus a list of the remaining ones to fetch individually. Content is the vendor's official documentation for this instance's release; it contains no tenant data.",
         {
@@ -469,7 +484,7 @@ export class AcumaticaMcpServer extends McpAgent<Env, Record<string, unknown>, A
     }
 
     // Stateless GI XML explainer — no index, no tenant call, always available.
-    this.server.tool(
+    this.tool(
       "acumatica_explain_gi_xml",
       "Summarize the structure of a Generic Inquiry definition XML (as exported from the GI editor, SM208000): tables joined, relations, parameters, filters, grouping/sorting, and output columns. Paste the GI XML to understand an existing inquiry's design. This is a reading aid that parses the pasted XML — it does not query Acumatica or validate the GI.",
       {
@@ -485,6 +500,33 @@ export class AcumaticaMcpServer extends McpAgent<Env, Record<string, unknown>, A
         );
       }
     );
+
+    await this.applyToolPolicy();
+  }
+
+  /**
+   * Annotate every registered tool and hide writer tools while the writes
+   * kill switch is off.
+   *
+   * - readOnlyHint is what Microsoft 365 Copilot federated connectors require
+   *   before they will enable a tool; Claude treats it as a hint only.
+   * - Hiding (disable) rather than removing keeps the writer tools registered,
+   *   so a future per-user write gate can re-enable them per session. runWriter
+   *   still enforces the kill switch on every call regardless.
+   * - Same "applies on the next DO instance" semantics as the other settings.
+   */
+  private async applyToolPolicy(): Promise<void> {
+    const writerNames = new Set(WRITER_TOOLS.map((s) => s.name));
+    for (const [name, registered] of this.registeredTools) {
+      const annotations = annotationsFor(name, writerNames);
+      registered.update({ title: annotations.title, annotations });
+    }
+    const enabled = writesEnabled(
+      await getConfig(this.appEnv.store, "writes_enabled", this.appEnv.ACUMATICA_WRITES_ENABLED)
+    );
+    if (!enabled) {
+      for (const name of writerNames) this.registeredTools.get(name)?.disable();
+    }
   }
 
   /**
