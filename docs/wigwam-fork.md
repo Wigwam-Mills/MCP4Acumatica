@@ -90,6 +90,47 @@ Compared `cchesebro-prog/mcp4acumatica` @ `55e3ab1` with this fork's `wrangler.j
 These are the only intended divergences from upstream, so expect a conflict in this
 file when a sync touches the same lines.
 
+## Upgrade notes, 0.38.5 to 0.53.0
+
+Read from `CHANGELOG.md` (all entries 0.39.0 to 0.53.0) and a file diff of `acumatica/`
+between the deployed repo and this fork, 2026-10-01.
+
+**Acumatica-side actions**
+
+- **Re-import `acumatica/MCPGIFields.xml` (0.48.0, required if the GI exposure gate is
+  in use).** It gains `SortOrder` and `IsActive` columns and the row filter
+  `UsrExposedToMCP = true AND ExposeViaOData = true`. Without the new columns the
+  server refuses to attach column descriptions and returns bare field names. After
+  importing, clear the GI cache with the `acumatica_clear_cache` tool (`target=gi`).
+  Whether Wigwam has the gate configured is not known from the repo.
+- **No change to the customization project.** `MCP4Acumatica-AIDescription.zip` is
+  identical in both repos (same file list in `diff -rq`; contents not compared
+  byte for byte beyond that). `MCPGIs.xml` and `MCPAccess.xml` are also unchanged.
+- **New optional authoring GIs** (`MCPGIColumnsAll`, `MCPGIJoinsAll`, `MCPGIWhereAll`,
+  `MCPGIDescriptionEditor`, `MCPGIColumnDescEditor`) exist only in the fork. Nothing
+  requires importing them.
+
+**Behavior changes to expect after deploy**
+
+- **One-time session reset (0.50.0).** Live MCP sessions get `Session not found`
+  on their first request; compliant clients re-initialize on their own.
+- **`ACUMATICA_MCP_ROLE` removed, `ACUMATICA_CANARY_GI` added (0.39.0).** Default
+  `MCPAccess`, so the existing canary GI keeps working.
+- **Rate limits are configurable (0.41.0)** at `/docs/admin/settings`. Defaults: 3
+  concurrent requests and 40 per minute per user, with a 2 s wait for a free slot.
+- **Preflight (0.45.0, 0.47.0).** Unauthenticated tenant and endpoint-version checks
+  now report `warn`, not `pass`, on a 401. Use the Authenticated checks form at
+  `/docs/admin/preflight/authed-checks` (renamed in 0.47.0).
+- **Writes stay off by default (0.40.0).** The one write tool,
+  `acumatica_create_or_update_customer`, is gated by "Enable Write Tools" in admin
+  settings and, since 0.53.0, is hidden from `tools/list` while writes are off.
+- **Dependency upgrade (0.50.0):** the `agents` SDK moves from 0.0.98 to 0.21.0. The
+  CHANGELOG lists the unit tests, `wrangler dev` and a dry-run deploy as passing
+  upstream. This session ran `tsc` and the unit tests only, so watch the first
+  deploy.
+- **Docs tools (0.51.0)** register only when an index exists in the `INDEX_STORE`
+  bucket; nothing happens if you don't build one.
+
 ## Cutting over the existing worker
 
 The deployed worker `mcp4acumatica` was created from `cchesebro-prog/mcp4acumatica`
