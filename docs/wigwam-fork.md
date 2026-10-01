@@ -57,6 +57,28 @@ Compare each line with your existing worker before the first deploy from this re
 Keep the worker name and hostname unchanged, or update the Connected
 Application redirect URI in Acumatica (SM303010).
 
+## Diff: deployed repo (0.38.5) vs this fork (0.53.0) `wrangler.jsonc`
+
+Compared `cchesebro-prog/mcp4acumatica` @ `55e3ab1` with this fork's `wrangler.jsonc`:
+
+- **Same:** worker name, compatibility settings, `ACUMATICA_URL` / `ACUMATICA_TENANT`
+  placeholders, endpoint version `25.200.001`, `ACUMATICA_MAX_RECORDS`, both Durable
+  Object bindings and migrations `v1`/`v2`, Logpush, and both R2 buckets. No new
+  bindings or migrations are needed for 0.53.0 on that file.
+- **KV ids:** the deployed repo has real ids for `TOKEN_STORE` and `OAUTH_KV` (two
+  different namespaces). This fork has empty ids. Copy the two ids from the
+  deployed repo's `wrangler.jsonc` or the deploy will provision new, empty namespaces
+  and users will have to sign in again.
+- **Renamed var:** the deployed repo sets `ACUMATICA_MCP_ROLE`. Upstream removed it
+  and replaced it with `ACUMATICA_CANARY_GI` (default `MCPAccess`), per the
+  CHANGELOG. The default means the old value can be dropped.
+- **R2 preview buckets:** the deployed repo adds `preview_bucket_name` to both R2
+  entries; upstream does not. Optional, only affects `wrangler dev`.
+- **Real Acumatica URL and tenant are not in the repo.** The deployed repo also has
+  placeholders, so the live values were set in the dashboard (not verified). If
+  Workers Builds redeploys without `keep_vars`, those dashboard values may be
+  overwritten by the placeholders.
+
 ## Cutting over the existing worker
 
 The deployed worker `mcp4acumatica` was created from `cchesebro-prog/mcp4acumatica`
@@ -71,5 +93,6 @@ The deployed worker `mcp4acumatica` was created from `cchesebro-prog/mcp4acumati
 
 - Upstream `package.json` (0.53.0), `CHANGELOG.md`, `wrangler.jsonc`, and
   `.github/workflows/*` read from this fork's `main` at commit `fa2c2e3`, 2026-10-01.
+- `cchesebro-prog/mcp4acumatica` `wrangler.jsonc` @ `55e3ab1` (0.38.5), read 2026-10-01.
 - Existing deployment facts (0.38.5, Cloudflare variable-override behavior) come
   from the 2026-10-01 handoff note and were not independently re-checked here.
