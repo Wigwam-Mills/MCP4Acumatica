@@ -149,6 +149,10 @@ The deployed worker `mcp4acumatica` was created from `cchesebro-prog/mcp4acumati
 3. In Cloudflare, reconnect Workers Builds for the worker to this repo and pick the production branch.
 4. Merge, let it deploy, then run `/docs/admin/preflight` and its **Authenticated checks** form (needs `ADMIN_SECRET`).
 
+**Status, 2026-10-01:** Workers Builds was switched to this repo (production branch `main`) and the
+first build here is triggered by the commit that added this note. Not yet verified: the build result,
+that the dashboard variables survived, and the preflight checks.
+
 ## Sources and refresh dates
 
 - Upstream `package.json` (0.53.0), `CHANGELOG.md`, `wrangler.jsonc`, and
