@@ -27,9 +27,9 @@
 
 	// Acumatica instance configuration. Edit these for your deployment
 	// (or leave the placeholders and override via the dashboard after deploy).
+	// WIGWAM: ACUMATICA_URL and ACUMATICA_TENANT are intentionally NOT set here; they
+	// live in the Cloudflare dashboard (this fork is public). See docs/wigwam-fork.md.
 	"vars": {
-		"ACUMATICA_URL": "https://your-instance.acumatica.com",
-		"ACUMATICA_TENANT": "YourTenant",
 		"ACUMATICA_ENDPOINT_VERSION": "25.200.001",
 		"ACUMATICA_ENDPOINT_NAME": "Default",
 		"ACUMATICA_MAX_RECORDS": "1000",

@@ -84,8 +84,16 @@ Compared `cchesebro-prog/mcp4acumatica` @ `55e3ab1` with this fork's `wrangler.j
 - `TOKEN_STORE` and `OAUTH_KV` ids copied from the deployed repo. Both exist in the
   Cloudflare account (`mcp4acumatica-app`, `mcp4acumatica-oauth`), checked 2026-10-01.
 - `"keep_vars": true` added.
-- Nothing else changed: the Acumatica URL and tenant are still placeholders, so
-  confirm the dashboard values exist before the first deploy from this repo.
+- `ACUMATICA_URL` and `ACUMATICA_TENANT` removed from `vars`. This fork is public, so
+  the real values stay in the Cloudflare dashboard only. Cloudflare's docs say a
+  deploy sets the vars found in the config file, so leaving upstream's placeholders
+  in could have overwritten the dashboard values even with `keep_vars`.
+- Dashboard check, 2026-10-01 (screenshot of Settings > Variables and secrets):
+  `ACUMATICA_URL`, `ACUMATICA_TENANT`, `ACUMATICA_ENDPOINT_NAME` (`Default`),
+  `ACUMATICA_ENDPOINT_VERSION` (`25.200.001`), `ACUMATICA_MAX_RECORDS` (`1000`) and
+  the obsolete `ACUMATICA_MCP_ROLE` are set; secrets `ACUMATICA_CLIENT_ID`,
+  `ACUMATICA_CLIENT_SECRET`, `ADMIN_SECRET`, `COOKIE_ENCRYPTION_KEY` exist.
+  `ACUMATICA_CANARY_GI` is not set, so it comes from this file (`MCPAccess`).
 
 These are the only intended divergences from upstream, so expect a conflict in this
 file when a sync touches the same lines.
