@@ -79,6 +79,17 @@ Compared `cchesebro-prog/mcp4acumatica` @ `55e3ab1` with this fork's `wrangler.j
   Workers Builds redeploys without `keep_vars`, those dashboard values may be
   overwritten by the placeholders.
 
+## Wigwam edits already applied to `wrangler.jsonc`
+
+- `TOKEN_STORE` and `OAUTH_KV` ids copied from the deployed repo. Both exist in the
+  Cloudflare account (`mcp4acumatica-app`, `mcp4acumatica-oauth`), checked 2026-10-01.
+- `"keep_vars": true` added.
+- Nothing else changed: the Acumatica URL and tenant are still placeholders, so
+  confirm the dashboard values exist before the first deploy from this repo.
+
+These are the only intended divergences from upstream, so expect a conflict in this
+file when a sync touches the same lines.
+
 ## Cutting over the existing worker
 
 The deployed worker `mcp4acumatica` was created from `cchesebro-prog/mcp4acumatica`

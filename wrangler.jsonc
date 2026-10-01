@@ -54,13 +54,17 @@
 	"kv_namespaces": [
 		{
 			"binding": "TOKEN_STORE",
-			"id": ""
+			"id": "eefdc85c159046f29b2027be0ea32ddc"
 		},
 		{
 			"binding": "OAUTH_KV",
-			"id": ""
+			"id": "cdba6cfefea04e0c887fcc98b5e85c20"
 		}
 	],
+
+	// WIGWAM: keep dashboard-set vars (ACUMATICA_URL, ACUMATICA_TENANT, ...) on deploy.
+	// See docs/wigwam-fork.md.
+	"keep_vars": true,
 
 	// Keep the *.workers.dev subdomain so the deploy is reachable without
 	// any DNS setup. Add custom-domain routes to your local copy if you
