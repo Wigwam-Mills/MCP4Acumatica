@@ -149,14 +149,26 @@ The deployed worker `mcp4acumatica` was created from `cchesebro-prog/mcp4acumati
 3. In Cloudflare, reconnect Workers Builds for the worker to this repo and pick the production branch.
 4. Merge, let it deploy, then run `/docs/admin/preflight` and its **Authenticated checks** form (needs `ADMIN_SECRET`).
 
-**Status, 2026-10-01:** Workers Builds was switched to this repo (production branch `main`) and the
-first build here is triggered by the commit that added this note. Not yet verified: the build result,
-that the dashboard variables survived, and the preflight checks.
+**Status**
+
+- **2026-10-01:** Workers Builds was switched to this repo (production branch `main`) and the
+  0.53.0 build deployed. The authenticated tenant check passed (`WIGWAM` confirmed), which also shows
+  `ACUMATICA_URL` and `ACUMATICA_TENANT` survived the deploy. A contract-API tool call
+  (`Warehouse` list) succeeded. The preflight "Contract endpoint (authenticated)" row showed a 401
+  warning; it GETs the bare endpoint root, and the working tool call suggests the warning is a
+  quirk of that check rather than a misconfiguration (not confirmed upstream).
+- **2026-11-12:** Synced with upstream 0.56.1 (PR #2, merge commit `e9375f0`). The build deployed
+  and preflight passed (reported by the operator). A post-deploy contract-API call (`Warehouse`
+  list) succeeded and `acumatica_list_generic_inquiries` returned no GIs with `gateInactive: true`.
+- **Not yet tested:** running a GI by exact name on 0.56.x, whose GI routing is stricter than
+  0.53.0 (see upstream `CHANGELOG.md` 0.56.0).
+- **GI exposure gate:** not enabled. `ACUMATICA_GI_PARAMETERS` and `ACUMATICA_GI_COUNT` are not set (off).
 
 ## Sources and refresh dates
 
 - Upstream `package.json` (0.53.0), `CHANGELOG.md`, `wrangler.jsonc`, and
   `.github/workflows/*` read from this fork's `main` at commit `fa2c2e3`, 2026-10-01.
 - `cchesebro-prog/mcp4acumatica` `wrangler.jsonc` @ `55e3ab1` (0.38.5), read 2026-10-01.
+- Deployment status above: operator reports and tool calls made from this session, 2026-10-01 and 2026-11-12.
 - Existing deployment facts (0.38.5, Cloudflare variable-override behavior) come
   from the 2026-10-01 handoff note and were not independently re-checked here.
