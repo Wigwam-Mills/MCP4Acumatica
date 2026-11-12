@@ -160,8 +160,9 @@ The deployed worker `mcp4acumatica` was created from `cchesebro-prog/mcp4acumati
 - **2026-11-12:** Synced with upstream 0.56.1 (PR #2, merge commit `e9375f0`). The build deployed
   and preflight passed (reported by the operator). A post-deploy contract-API call (`Warehouse`
   list) succeeded and `acumatica_list_generic_inquiries` returned no GIs with `gateInactive: true`.
-- **Not yet tested:** running a GI by exact name on 0.56.x, whose GI routing is stricter than
-  0.53.0 (see upstream `CHANGELOG.md` 0.56.0).
+- **GI by exact name on 0.56.1 (2026-11-12):** `EG UPC Report` (OData-exposed, parameter-free) was
+  described (42 fields) and run with `ItemStatus eq 'Active'` and a 3-row cap; 3 rows came back. So
+  the stricter GI routing from 0.56.0 did not block it. Only this one GI was tested.
 - **GI exposure gate:** not enabled. `ACUMATICA_GI_PARAMETERS` and `ACUMATICA_GI_COUNT` are not set (off).
 
 ## Sources and refresh dates
