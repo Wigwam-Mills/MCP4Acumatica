@@ -33,7 +33,10 @@
 		"ACUMATICA_ENDPOINT_VERSION": "25.200.001",
 		"ACUMATICA_ENDPOINT_NAME": "Default",
 		"ACUMATICA_MAX_RECORDS": "1000",
-		"ACUMATICA_CANARY_GI": "MCPAccess"
+		"ACUMATICA_CANARY_GI": "MCPAccess",
+		// WIGWAM: run parameterized GIs through their _WithParameters function (upstream 0.56.0).
+		// Off, GIs with parameters (e.g. "Open Sales Orders") are refused. See docs/wigwam-fork.md.
+		"ACUMATICA_GI_PARAMETERS": "true"
 	},
 
 	// KV namespaces. TOKEN_STORE holds per-user Acumatica tokens, OAuth
