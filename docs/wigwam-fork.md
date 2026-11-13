@@ -170,13 +170,37 @@ The deployed worker `mcp4acumatica` was created from `cchesebro-prog/mcp4acumati
 - **GI by exact name on 0.56.1 (2026-11-12):** `EG UPC Report` (OData-exposed, parameter-free) was
   described (42 fields) and run with `ItemStatus eq 'Active'` and a 3-row cap; 3 rows came back. So
   the stricter GI routing from 0.56.0 did not block it. Only this one GI was tested.
-- **GI exposure gate:** not enabled. `ACUMATICA_GI_PARAMETERS` and `ACUMATICA_GI_COUNT` are not set (off).
+- **GI exposure gate:** not enabled. `ACUMATICA_GI_COUNT` is not set (off). `ACUMATICA_GI_PARAMETERS` is on since 2026-11-13 (see below).
+
+## Parameterized GIs in use
+
+**Rule:** with `ACUMATICA_GI_PARAMETERS` on, `acumatica_run_inquiry` must be given `parameters` (a JSON
+string) for any GI that takes parameters. `{}` runs it with every optional parameter at its default; a
+call without the argument is refused and returns the parameter list.
+
+**"Open Sales Orders" (Screen ID GI992946, tested 2026-11-13)**
+- One parameter, `CurrentUser`: optional, schema field `SOOrder.CreatedByID`, display name `User`,
+  default value `@me` (SM208000 > Parameters tab).
+- Before 0.56.0 this GI was not recognized as parameterized (spaces in its name), so it ran unflagged.
+  After the 0.56.x sync it was refused until `ACUMATICA_GI_PARAMETERS` was turned on.
+- Tests on order 3213438 with `OrderNbr eq '3213438'`: `{}`, `{"CurrentUser":"cchesebro"}` and
+  `{"CurrentUser":"sczekala"}` each returned the order. So for that order the default did not exclude
+  it. A made-up user name makes Acumatica error (`'[CreatedByID]' cannot be found in the system`).
+- **Not established:** that `{}` returns every open order. Only one order was tested, row counts were not
+  compared, and the GI's Conditions tab was not reviewed. Compare the first scheduled run's row count
+  with a count taken in Acumatica.
+- **Scheduled jobs** that use this GI must pass `parameters` (use `{}` if the defaults are acceptable).
+
+## Verification log
+
+- 2026-11-12: `EG UPC Report` (no parameters) described and run on 0.56.1.
+- 2026-11-13: `Open Sales Orders` described and run with `ACUMATICA_GI_PARAMETERS` on (above).
 
 ## Sources and refresh dates
 
 - Upstream `package.json` (0.53.0), `CHANGELOG.md`, `wrangler.jsonc`, and
   `.github/workflows/*` read from this fork's `main` at commit `fa2c2e3`, 2026-10-01.
 - `cchesebro-prog/mcp4acumatica` `wrangler.jsonc` @ `55e3ab1` (0.38.5), read 2026-10-01.
-- Deployment status above: operator reports and tool calls made from this session, 2026-10-01 and 2026-11-12.
+- Deployment status and GI tests above: operator reports, screenshots of SM208000 and tool calls made from this session, 2026-10-01 to 2026-11-13.
 - Existing deployment facts (0.38.5, Cloudflare variable-override behavior) come
   from the 2026-10-01 handoff note and were not independently re-checked here.
