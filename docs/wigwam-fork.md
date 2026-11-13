@@ -95,6 +95,13 @@ Compared `cchesebro-prog/mcp4acumatica` @ `55e3ab1` with this fork's `wrangler.j
   `ACUMATICA_CLIENT_SECRET`, `ADMIN_SECRET`, `COOKIE_ENCRYPTION_KEY` exist.
   `ACUMATICA_CANARY_GI` is not set, so it comes from this file (`MCPAccess`).
 
+- `"ACUMATICA_GI_PARAMETERS": "true"` added to `vars` (2026-11-13). After the 0.56.x sync, the GI
+  "Open Sales Orders" (which takes parameters, and has spaces in its name) started failing with
+  `parameterized_not_supported`: upstream 0.56.0 fixed a bug that had let parameterized GIs with
+  spaces or punctuation in their name run unrecognized, and the switch is off by default. With it on,
+  `acumatica_run_inquiry` needs a `parameters` argument (a JSON string; `{}` runs at the GI's defaults)
+  and refuses a call that omits it.
+
 These are the only intended divergences from upstream, so expect a conflict in this
 file when a sync touches the same lines.
 
